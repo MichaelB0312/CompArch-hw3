@@ -134,7 +134,7 @@ int main(int argc, const char *argv[]) {
     char *endPtr;
 
     if (argc < 3) {
-        usage();
+        usage(); //exit.. due to an error
     }
 
     printf("Reading the opcodes latency info from %s ... ", opFname);
