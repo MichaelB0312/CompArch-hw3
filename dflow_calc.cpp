@@ -22,35 +22,38 @@ typedef struct {
     vector<vector<InstNode>> adjList; //vector of depended instruction vectors
 }Graph;
 
+
+typedef struct {
+	int curr_dist;
+	unsigned int instIdx;
+	unsigned int parent; //instruction which caused a change in the heap
+}Node;
+
+bool CompareByValue(const Node& a, const Node& b) {
+      return a.curr_dist < b.curr_dist;
+}
+
+typedef struct {
+	int curr_dist;
+	unsigned int instIdx;
+}heap_node;
+
+struct NodeComparator {
+	bool operator()(const heap_node& node1, const heap_node& node2) {
+    		return node1.curr_dist > node2.curr_dist;
+	}
+};
+
+
+
 /** dijkstra: finding the depth from every inst. based on a reveresed version of Dijkstra Source Single Shortest Path
-    \param[in]:source : The idx of desired instruction.  
+  }                                                       \param[in]:source : The idx of desired instruction.  
     \param[in] 
     \returns 
 */
 int dijkstra(Graph graph, unsigned int source) {
 
     vector<unsigned int> weights; //edges vector
-
-    typedef struct {
-        int curr_dist;
-        unsigned int instIdx;
-        unsigned int parent; //instruction which caused a change in the heap
-    }Node;
-
-    typedef struct {
-        int curr_dist;
-        unsigned int instIdx;
-    }heap_node;
-
-    struct NodeComparator {
-        bool operator()(const heap_node& node1, const heap_node& node2) {
-            return node1.curr_dist > node2.curr_dist;
-        }
-    };
-
-    bool CompareByValue(const Node& a, const Node& b) {
-        return a.curr_dist < b.curr_dist;
-    }
 
     vector<Node> distances;
     vector<heap_node> heap; // the Q
@@ -61,7 +64,7 @@ int dijkstra(Graph graph, unsigned int source) {
             Node dist_node; heap_node heap_node;
             dist_node.curr_dist = -1;
             dist_node.instIdx = node.idx;
-            dist_node.parent = nullptr;
+            dist_node.parent = NULL;
             heap_node.curr_dist = -1;
             heap_node.instIdx = node.idx;
             if (dist_node.instIdx == source) {
@@ -84,7 +87,7 @@ int dijkstra(Graph graph, unsigned int source) {
         // find the curr_max in adjList
         const vector<InstNode>& instructionVec = graph.adjList[curr_max.instIdx];
         for (const InstNode& neighbors : instructionVec) { //neighbors is w from pseudo code
-            if (distances[neighbors.idx].curr_dist < curr_max.curr_dist + weights[curr_max.instIdx]) {
+            if (distances[neighbors.idx].curr_dist < (curr_max.curr_dist + weights[curr_max.instIdx])) {
                 distances[neighbors.idx].curr_dist = curr_max.curr_dist + weights[curr_max.instIdx];
                 distances[neighbors.idx].parent = curr_max.instIdx;
                 //update the heap / increase key
@@ -95,7 +98,7 @@ int dijkstra(Graph graph, unsigned int source) {
                     });
 
                 heap[it->instIdx].curr_dist = curr_max.curr_dist;
-                heap_node[it->instIdx].instIdx = curr_max.instIdx;
+                heap[it->instIdx].instIdx = curr_max.instIdx;
                 // Rearrange the heap to maintain the heap property
                 make_heap(heap.begin(), heap.end(), NodeComparator());
 
@@ -131,13 +134,14 @@ ProgCtx analyzeProg(const unsigned int opsLatency[], const InstInfo progTrace[],
         for (int j = i - 1; j >= 0; j--) {
             if ((currInst.src1Idx == progTrace[j].dstIdx) && !(flag_src1)) {
                 
+		
                 graph->adjList[i].push_back(depNode);
-                graph->adjList[i].src1_dep = j;
                 flag_src1 = 1;
             }
 
             if ((currInst.src2Idx == progTrace[j].dstIdx) && !(flag_src2)) {
 
+		depNode.src2_dep = j;
                 graph->adjList[i].push_back(depNode);
                 graph->adjList[i].src2_dep = j;
                 flag_src2 = 1;
