@@ -16,17 +16,17 @@ typedef struct _thread {
 	tcontext* RegFile;
 	int idle_cyc_num = 0;
 	int inst_num = 0;
-	bool is_active = 1; 
+	bool is_active = true; 
 } Thread;
 
 typedef struct _MT {
-	struct Thread* threads;
+	Thread* threads;
 	int CycNum;
 	int InstNum;
 } MT;
 
-struct MT* Blocked;
-struct MT* FineGrained;
+MT* Blocked;
+MT* FineGrained;
 
 void CORE_BlockedMT() {
 	int numOfThreads = SIM_GetThreadsNum();
@@ -45,7 +45,7 @@ void CORE_BlockedMT() {
 		Blocked->threads[i].RegFile = {0};
 	}
 	
-	SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
+	//SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
 	
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
@@ -63,7 +63,7 @@ void CORE_BlockedMT() {
 				Blocked->InstNum++;
 				
 				inst_num = Blocked->threads[thr].inst_num;
-				opc = instructions[thr][inst_num].opcode;
+				int opc = instructions[thr][inst_num].opcode;
 				Blocked->threads[thr].inst_num++;
 				
 				if(opc == CMD_HALT){
@@ -84,17 +84,17 @@ void CORE_BlockedMT() {
 					src2_index_imm = instructions[thr][inst_num].src2_index_imm;
 					isSrc2Imm = instructions[thr][inst_num].isSrc2Imm;
 					
-					src1 = Blocked->threads[i].RegFile->reg[src1_index];
+					src1 = Blocked->threads[thr].RegFile->reg[src1_index];
 					if(isSrc2Imm){
 						src2 = src2_index_imm;
 					} else {
-						src2 = Blocked->threads[i].RegFile->reg[src2_index_imm];
+						src2 = Blocked->threads[thr].RegFile->reg[src2_index_imm];
 					}
 			
 					if (opc == CMD_ADD || opc == CMD_ADDI){
-						Blocked->threads[i].RegFile->reg[dst_index] = src1+src2;
+						Blocked->threads[thr].RegFile->reg[dst_index] = src1+src2;
 					} else if (opc == CMD_SUB || opc == CMD_SUBI){
-						Blocked->threads[i].RegFile->reg[dst_index] = src1-src2;
+						Blocked->threads[thr].RegFile->reg[dst_index] = src1-src2;
 					}
 					continue;
 					
@@ -107,18 +107,18 @@ void CORE_BlockedMT() {
 					src2_index_imm = instructions[thr][inst_num].src2_index_imm;
 					isSrc2Imm = instructions[thr][inst_num].isSrc2Imm;
 					
-					dst = Blocked->threads[i].RegFile->reg[dst_index];
-					src1 = Blocked->threads[i].RegFile->reg[src1_index];
+					dst = Blocked->threads[thr].RegFile->reg[dst_index];
+					src1 = Blocked->threads[thr].RegFile->reg[src1_index];
 					if(isSrc2Imm){
 						src2 = src2_index_imm;
 					} else {
-						src2 = Blocked->threads[i].RegFile->reg[src2_index_imm];
+						src2 = Blocked->threads[thr].RegFile->reg[src2_index_imm];
 					}
 					
 					//update memory and idle time
 					if (opc == CMD_LOAD){
 						uint32_t addr = src1 + src2;
-						int32_t *dst = &(Blocked->threads[i].RegFile->reg[dst_index]);
+						int32_t *dst = &(Blocked->threads[thr].RegFile->reg[dst_index]);
 						SIM_MemDataRead(addr, dst);
 						Blocked->threads[thr].idle_cyc_num = LoadLat;
 					} else if (opc == CMD_STORE){
@@ -151,7 +151,7 @@ void CORE_FinegrainedMT() {
 		FineGrained->threads[i].RegFile = {0};
 	}
 	
-	SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
+	//SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
 	
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
@@ -168,7 +168,7 @@ void CORE_FinegrainedMT() {
 			FineGrained->InstNum++;
 			
 			inst_num = FineGrained->threads[thr].inst_num;
-			opc = instructions[thr][inst_num].opcode;
+			int opc = instructions[thr][inst_num].opcode;
 			FineGrained->threads[thr].inst_num++;
 			
 			if(opc == CMD_HALT){
@@ -189,17 +189,17 @@ void CORE_FinegrainedMT() {
 				src2_index_imm = instructions[thr][inst_num].src2_index_imm;
 				isSrc2Imm = instructions[thr][inst_num].isSrc2Imm;
 				
-				src1 = FineGrained->threads[i].RegFile->reg[src1_index];
+				src1 = FineGrained->threads[thr].RegFile->reg[src1_index];
 				if(isSrc2Imm){
 					src2 = src2_index_imm;
 				} else {
-					src2 = FineGrained->threads[i].RegFile->reg[src2_index_imm];
+					src2 = FineGrained->threads[thr].RegFile->reg[src2_index_imm];
 				}
 		
 				if (opc == CMD_ADD || opc == CMD_ADDI){
-					FineGrained->threads[i].RegFile->reg[dst_index] = src1+src2;
+					FineGrained->threads[thr].RegFile->reg[dst_index] = src1+src2;
 				} else if (opc == CMD_SUB || opc == CMD_SUBI){
-					FineGrained->threads[i].RegFile->reg[dst_index] = src1-src2;
+					FineGrained->threads[thr].RegFile->reg[dst_index] = src1-src2;
 				}
 				continue;
 				
@@ -212,18 +212,18 @@ void CORE_FinegrainedMT() {
 				src2_index_imm = instructions[thr][inst_num].src2_index_imm;
 				isSrc2Imm = instructions[thr][inst_num].isSrc2Imm;
 				
-				dst = FineGrained->threads[i].RegFile->reg[dst_index];
-				src1 = FineGrained->threads[i].RegFile->reg[src1_index];
+				dst = FineGrained->threads[thr].RegFile->reg[dst_index];
+				src1 = FineGrained->threads[thr].RegFile->reg[src1_index];
 				if(isSrc2Imm){
 					src2 = src2_index_imm;
 				} else {
-					src2 = FineGrained->threads[i].RegFile->reg[src2_index_imm];
+					src2 = FineGrained->threads[thr].RegFile->reg[src2_index_imm];
 				}
 				
 				//update memory and idle time
 				if (opc == CMD_LOAD){
 					uint32_t addr = src1 + src2;
-					int32_t *dst = &(FineGrained->threads[i].RegFile->reg[dst_index]);
+					int32_t *dst = &(FineGrained->threads[thr].RegFile->reg[dst_index]);
 					SIM_MemDataRead(addr, dst);
 					FineGrained->threads[thr].idle_cyc_num = LoadLat;
 				} else if (opc == CMD_STORE){
@@ -242,9 +242,7 @@ void CORE_FinegrainedMT() {
 double CORE_BlockedMT_CPI(){
 	double BlockedMT_CPI = (Blocked->CycNum / Blocked->InstNum);
 
-	for( int i = 0; i < threadnumber; i++){
-		delete Blocked->threads[i];
-	}
+	delete[] Blocked->threads;
 	delete[] Blocked;
 	
 	return BlockedMT_CPI;
@@ -253,9 +251,7 @@ double CORE_BlockedMT_CPI(){
 double CORE_FinegrainedMT_CPI(){
 	double FinegrainedMT_CPI = (FineGrained->CycNum / FineGrained->InstNum);
 	
-	for( int i = 0; i < threadnumber; i++){
-		delete FineGrained->threads[i];
-	}
+	delete FineGrained->threads;
 	delete[] FineGrained;
 	
 	return FinegrainedMT_CPI;
