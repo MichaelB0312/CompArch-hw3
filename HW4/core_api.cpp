@@ -211,12 +211,11 @@ void CORE_FinegrainedMT() {
 				continue; //thread inactive
 			}
 			
-			FineGrained->CycNum++;
 			if(FineGrained->threads[thr].idle_cyc_num > 0){
-				update_threads_idle(FineGrained, 1);
 				continue; //thread in idle state
 			}
 			
+			FineGrained->CycNum++;
 			update_threads_idle(FineGrained, 1);
 			FineGrained->InstNum++;
 			
