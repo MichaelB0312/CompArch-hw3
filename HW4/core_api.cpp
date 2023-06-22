@@ -30,7 +30,7 @@ MT* FineGrained;
 
 void update_threads_idle(MT* Blocked, int cyc_num){
 	for( int j=0 ; j<cyc_num; j++){
-		for( int i=0; i<numOfThreads; i++){
+		for( int i=0; i<threadnumber; i++){
 			if (Blocked->threads[i].idle_cyc_num > 0){
 				Blocked->threads[i].idle_cyc_num--;
 			}
@@ -51,12 +51,17 @@ void CORE_BlockedMT() {
 	Blocked->CycNum = 0;
 	Blocked->InstNum = 0;
 	bool first_cyc_in_thread = 1;
+
 	for( int i = 0; i < numOfThreads; i++){
-		Blocked->threads[i].RegFile = {0};
+		Blocked->threads[i].RegFile = new tcontext;
+		for (int j = 0; j < REGS_COUNT; j++) {
+    			Blocked->threads[i].RegFile->reg[j] = 0;
+		}
 	}
 		
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
+			int  curr_thr = thr;
 			first_cyc_in_thread = true;
 			if(Blocked->threads[thr].is_active == 0){
 				continue; //thread inactive
@@ -86,7 +91,7 @@ void CORE_BlockedMT() {
 				if(opc == CMD_HALT){
 					Blocked->threads[thr].is_active = 0;
 					numHalt++;
-					int curr_thr = thr;
+					curr_thr = thr;
 					thr += 1;
 				}
 				else if(opc == CMD_NOP){
@@ -145,7 +150,7 @@ void CORE_BlockedMT() {
 						SIM_MemDataWrite(addr, val);
 						Blocked->threads[thr].idle_cyc_num = StoreLat;
 					}
-					int curr_thr = thr;
+					curr_thr = thr;
 				} // end if load or store
 				
 				//check which thread is next, with smallest idle cycles
@@ -172,7 +177,7 @@ void CORE_BlockedMT() {
 				
 				//check if context switch
 				if( curr_thr != min_idle_thread ){
-					first_cyc_in_thread == true;
+					first_cyc_in_thread = true;
 				}
 
 				
@@ -194,11 +199,12 @@ void CORE_FinegrainedMT() {
 	FineGrained->InstNum = 0;
 	
 	for( int i = 0; i < numOfThreads; i++){
-		FineGrained->threads[i].RegFile = {0};
+		FineGrained->threads[i].RegFile = new tcontext;
+		for (int j = 0; j < REGS_COUNT; j++) {
+    			FineGrained->threads[i].RegFile->reg[j] = 0;
+		}
 	}
-	
-	//SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
-	
+
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
 			if(FineGrained->threads[thr].is_active == 0){
@@ -206,12 +212,12 @@ void CORE_FinegrainedMT() {
 			}
 			
 			FineGrained->CycNum++;
-			update_threads_idle(FineGrained, 1);
 			if(FineGrained->threads[thr].idle_cyc_num > 0){
-				FineGrained->threads[thr].idle_cyc_num--;
+				update_threads_idle(FineGrained, 1);
 				continue; //thread in idle state
 			}
 			
+			update_threads_idle(FineGrained, 1);
 			FineGrained->InstNum++;
 			
 			inst_num = FineGrained->threads[thr].inst_num;
@@ -221,7 +227,6 @@ void CORE_FinegrainedMT() {
 			if(opc == CMD_HALT){
 				FineGrained->threads[thr].is_active = 0;
 				numHalt++;
-				continue;
 			}
 			else if(opc == CMD_NOP){
 				continue;
@@ -279,8 +284,8 @@ void CORE_FinegrainedMT() {
 					SIM_MemDataWrite(addr, val);
 					FineGrained->threads[thr].idle_cyc_num = StoreLat;
 				}	
-				continue;
 			} // end if load or store
+
 		} // end for of round robbin of threads
 	} // end while not all threads halted	
 	
@@ -288,18 +293,23 @@ void CORE_FinegrainedMT() {
 
 double CORE_BlockedMT_CPI(){
 	double BlockedMT_CPI = (Blocked->CycNum / Blocked->InstNum);
-
+	for( int i=0; i<threadnumber  ;i++){
+		delete[] Blocked->threads[i].RegFile;
+	}
 	delete[] Blocked->threads;
-	delete[] Blocked;
+	delete Blocked;
 	
 	return BlockedMT_CPI;
 }
 
 double CORE_FinegrainedMT_CPI(){
 	double FinegrainedMT_CPI = (FineGrained->CycNum / FineGrained->InstNum);
+	for( int i=0; i<threadnumber  ;i++){
+		delete[] FineGrained->threads[i].RegFile;
+	}
 	
-	delete FineGrained->threads;
-	delete[] FineGrained;
+	delete[] FineGrained->threads;
+	delete FineGrained;
 	
 	return FinegrainedMT_CPI;
 }
