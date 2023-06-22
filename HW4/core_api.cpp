@@ -40,7 +40,7 @@ void CORE_BlockedMT() {
 	Blocked->threads = new Thread[numOfThreads];
 	Blocked->CycNum = 0;
 	Blocked->InstNum = 0;
-	
+	bool first_cyc_in_thread = 1;
 	for( int i = 0; i < numOfThreads; i++){
 		Blocked->threads[i].RegFile = {0};
 	}
@@ -49,17 +49,24 @@ void CORE_BlockedMT() {
 	
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
+			first_cyc_in_thread = true;
 			if(Blocked->threads[thr].is_active == 0){
 				continue; //thread inactive
 			}
 			
 			if(Blocked->threads[thr].idle_cyc_num > 0){
-				Blocked->CycNum++;
-				Blocked->threads[thr].idle_cyc_num--;
+				Blocked->CycNum += SwitchCycles;
+				Blocked->threads[thr].idle_cyc_num -= SwitchCycles;
 				continue; //thread in idle state
 			}
+			
 			while( Blocked->threads[thr].is_active && Blocked->threads[thr].idle_cyc_num==0){
-				Blocked->CycNum++;
+				if( first_cyc_in_thread == true){
+					Blocked->CycNum += SwitchCycles;
+					first_cyc_in_thread = false;
+				} else {
+					Blocked->CycNum++;
+				}
 				Blocked->InstNum++;
 				
 				inst_num = Blocked->threads[thr].inst_num;
@@ -129,6 +136,9 @@ void CORE_BlockedMT() {
 					}	
 					continue;
 				} // end if load or store
+				
+				//check if all threads idle
+				for( int thr=0 ; thr<numOfThreads; thr++){
 			} // end while of one thread
 		} // end for of round robbin of threads
 	} // end while not all threads halted	
@@ -138,7 +148,6 @@ void CORE_FinegrainedMT() {
 	int numOfThreads = SIM_GetThreadsNum();
 	int LoadLat = SIM_GetLoadLat();
 	int StoreLat = SIM_GetStoreLat();
-	int SwitchCycles = SIM_GetSwitchCycles();
 	int numHalt = 0;
 	int inst_num = 0;
 	
