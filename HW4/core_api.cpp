@@ -28,6 +28,16 @@ typedef struct _MT {
 MT* Blocked;
 MT* FineGrained;
 
+void update_threads_idle(MT* Blocked, int cyc_num){
+	for( int j=0 ; j<cyc_num; j++){
+		for( int i=0; i<numOfThreads; i++){
+			if (Blocked->threads[i].idle_cyc_num > 0){
+				Blocked->threads[i].idle_cyc_num--;
+			}
+		}
+	}
+}
+
 void CORE_BlockedMT() {
 	int numOfThreads = SIM_GetThreadsNum();
 	int LoadLat = SIM_GetLoadLat();
@@ -44,9 +54,7 @@ void CORE_BlockedMT() {
 	for( int i = 0; i < numOfThreads; i++){
 		Blocked->threads[i].RegFile = {0};
 	}
-	
-	//SIM_MemInstRead(uint32_t line, Instruction *dst, int tid);
-	
+		
 	while( numHalt != numOfThreads){
 		for( int thr=0 ; thr<numOfThreads; thr++){
 			first_cyc_in_thread = true;
@@ -64,8 +72,10 @@ void CORE_BlockedMT() {
 				if( first_cyc_in_thread == true){
 					Blocked->CycNum += SwitchCycles;
 					first_cyc_in_thread = false;
+					update_threads_idle(Blocked, SwitchCycles);
 				} else {
 					Blocked->CycNum++;
+					update_threads_idle(Blocked, 1);
 				}
 				Blocked->InstNum++;
 				
@@ -76,7 +86,8 @@ void CORE_BlockedMT() {
 				if(opc == CMD_HALT){
 					Blocked->threads[thr].is_active = 0;
 					numHalt++;
-					continue;
+					int curr_thr = thr;
+					thr += 1;
 				}
 				else if(opc == CMD_NOP){
 					continue;
@@ -133,12 +144,38 @@ void CORE_BlockedMT() {
 						int32_t val = src1;
 						SIM_MemDataWrite(addr, val);
 						Blocked->threads[thr].idle_cyc_num = StoreLat;
-					}	
-					continue;
+					}
+					int curr_thr = thr;
 				} // end if load or store
 				
-				//check if all threads idle
-				for( int thr=0 ; thr<numOfThreads; thr++){
+				//check which thread is next, with smallest idle cycles
+				int min_idle = Blocked->threads[thr].idle_cyc_num;
+				int min_idle_thread = thr;
+				// go round robbing starting from current thread
+				for( int thr_id=thr+1 ; thr_id<numOfThreads; thr_id++){
+					if ( (Blocked->threads[thr_id].idle_cyc_num < min_idle) && 
+							Blocked->threads[thr_id].is_active ){
+						min_idle = Blocked->threads[thr_id].idle_cyc_num;
+						min_idle_thread = thr_id;
+					}
+				}
+				for( int thr_id=0 ; thr_id<thr; thr_id++){
+					if ( (Blocked->threads[thr_id].idle_cyc_num < min_idle) && 
+							Blocked->threads[thr_id].is_active ){
+						min_idle = Blocked->threads[thr_id].idle_cyc_num;
+						min_idle_thread = thr_id;
+					}
+				}
+				//update cyc num
+				Blocked->CycNum += min_idle;
+				update_threads_idle(Blocked, min_idle);
+				
+				//check if context switch
+				if( curr_thr != min_idle_thread ){
+					first_cyc_in_thread == true;
+				}
+
+				
 			} // end while of one thread
 		} // end for of round robbin of threads
 	} // end while not all threads halted	
@@ -169,6 +206,7 @@ void CORE_FinegrainedMT() {
 			}
 			
 			FineGrained->CycNum++;
+			update_threads_idle(FineGrained, 1);
 			if(FineGrained->threads[thr].idle_cyc_num > 0){
 				FineGrained->threads[thr].idle_cyc_num--;
 				continue; //thread in idle state
